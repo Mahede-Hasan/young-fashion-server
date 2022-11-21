@@ -1,6 +1,6 @@
 const express = require('express');
 const cors = require('cors');
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const app = express()
 const port = process.env.PORT || 5000;
 require('dotenv').config()
@@ -18,25 +18,60 @@ async function run() {
     try {
         client.connect()
         const productsCollection = client.db('young-fashion').collection('products');
+        const cartCollection = client.db('young-fashion').collection('carts');
 
         // get all products
         app.get('/products', async (req, res) => {
-            const page = parseInt(req.query.page);
-            const size = parseInt(req.query.size);
-            // some work for pagination
             const query = {};
-            const cursor = productsCollection.find
-                (query);
+            const cursor = productsCollection.find(query);
             let products;
-            if (page || size) {
-                products = await cursor.skip(page * size).limit(size).toArray();
+            products = await cursor.toArray();
+            const search = req.query.search
+            if (search) {
+                const searchResult = products.filter(product => product.name.toLowerCase().includes(search))
+                res.send(searchResult)
             }
             else {
-                products = await cursor.toArray();
-            }
+                const page = parseInt(req.query.page);
+                const size = parseInt(req.query.size);
+                // some work for pagination
+                const query = {};
+                const cursor = productsCollection.find(query);
 
-            res.send(products);
+                if (page || size) {
+                    products = await cursor.skip(page * size).limit(size).toArray();
+                }
+                else {
+                    products = await cursor.toArray();
+                }
+                const search = req.query.search;
+                res.send(products);
+            }
         })
+
+        // add new Product
+        app.post('/products', async(req,res)=>{
+            const newProduct = req.body;
+            const product = await productsCollection.insertOne(newProduct);
+            res.send(product)
+        })
+
+        // delete product
+        app.delete('/products/:id', async(req,res)=>{
+            const id = req.params.id;
+            const query = {_id: ObjectId(id)}
+            const result = await productsCollection.deleteOne(query);
+            res.send(result)
+        })
+
+        app.post('/carts', async(req,res)=>{
+            console.log(req.body)
+            const cart = req.body;
+            const result = await cartCollection.insertOne(cart);
+            res.send(result)
+        })
+
+
 
     }
 
